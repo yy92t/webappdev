@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base target="_top">
+  <title>Ad Ops Hub</title>
+  <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --primary-color: #FF5722; /* Deep Orange */
+      --primary-hover: #F4511E;
+      --sidebar-bg: #212529; /* Dark Grey/Black */
+      --sidebar-text: #FFFFFF;
+      --sidebar-hover: #343a40;
+      --light-color: #FFFFFF;
+      --text-dark: #000000;
+      --background-main: #f5f5f5;
+      --background-card: #FFFFFF;
+      --border-color: #e0e0e0;
+    }
+    body { font-family: 'Segoe UI', 'Roboto', sans-serif; margin: 0; padding: 0; background-color: var(--background-main); display: flex; }
+    
+    /* --- Sidebar Styles (Width Increased) --- */
+    #sidebar {
+      width: 280px; /* Increased width */
+      background-color: var(--sidebar-bg);
+      color: var(--sidebar-text);
+      height: 100vh;
+      position: fixed;
+      left: 0;
+      top: 0;
+      padding-top: 20px;
+      transition: all 0.3s;
+      z-index: 200;
+      overflow-y: auto;
+    }
+    #sidebar.collapsed {
+      width: 0;
+      padding-left: 0;
+      padding-right: 0;
+    }
+    #sidebar-content {
+      padding: 0 15px;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    #sidebar.collapsed #sidebar-content {
+      display: none;
+    }
+    #sidebar h2 {
+      text-align: center;
+      margin-bottom: 2rem;
+      font-size: 1.5rem;
+    }
+    .nav-group { margin-bottom: 1.5rem; padding: 0 15px; }
+    .nav-group-title {
+        padding: 0 0 10px 0;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        color: #adb5bd;
+    }
+    #sidebar a, .sidebar-btn {
+      padding: 12px 15px;
+      text-decoration: none;
+      font-size: 1rem;
+      color: var(--sidebar-text);
+      display: block;
+      border-radius: 8px;
+      margin-bottom: 5px;
+      background: none;
+      border: none;
+      width: 100%;
+      text-align: left;
+      cursor: pointer;
+      box-sizing: border-box;
+    }
+    #sidebar a:hover, .sidebar-btn:hover {
+      background-color: var(--sidebar-hover);
+    }
+    #sidebar a i, .sidebar-btn i {
+      margin-right: 10px;
+      width: 20px;
+      text-align: center;
+    }
+    .dropdown-content {
+      display: none;
+      padding-left: 25px;
+    }
+    .dropdown-container {
+      padding: 0 !important; /* Remove padding from container to allow full-width buttons */
+    }
+    .dropdown-container.active .dropdown-content {
+      display: block;
+    }
+    .dropdown-container.active > .dropdown-toggle {
+        background-color: var(--primary-color);
+    }
+    .dropdown-toggle::after {
+        content: '\f078'; /* Font Awesome down arrow */
+        font-family: "Font Awesome 6 Free";
+        font-weight: 900;
+        float: right;
+        transition: transform 0.3s;
+    }
+    .dropdown-container.active .dropdown-toggle::after {
+        transform: rotate(180deg);
+    }
+    #sidebar .search-input, #sidebar .entry-input {
+      width: 100%;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      font-size: 0.9rem;
+      box-sizing: border-box; /* Important for 100% width */
+      margin-bottom: 10px;
+    }
+
+    /* --- Main Content Styles (Padding Adjusted) --- */
+    #page-content-wrapper {
+      width: 100%;
+      padding-left: 280px; /* Adjusted for new sidebar width */
+      transition: all 0.3s;
+    }
+    #sidebar.collapsed + #page-content-wrapper {
+      padding-left: 0;
+    }
+    .container { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
+
+    /* --- Menu Toggle Button --- */
+    #menu-toggle {
+      position: fixed;
+      top: 15px;
+      left: 15px;
+      z-index: 300;
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1.2rem;
+    }
+    
+    /* --- Other existing styles --- */
+    .btn { padding: 10px 20px; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: background-color 0.3s ease; text-decoration: none; display: inline-block; text-align: center; }
+    .btn-primary { background-color: var(--primary-color); color: var(--light-color); }
+    #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+    #login-box { background-color: var(--background-card); padding: 2rem 3rem; border-radius: 12px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+    .header { text-align: center; margin-bottom: 2rem; color: var(--text-dark); }
+    .chart-card { background-color: var(--background-card); padding: 2rem; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); min-height: 400px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+    .loading-container, .no-data-message, .error-message, .welcome-message { text-align: center; padding: 5rem; color: #777; }
+    #search-results-container { background-color: var(--background-card); padding: 2rem; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); margin-top: 2rem; }
+    .search-result { border-bottom: 1px solid #e9ecef; padding: 1.5rem 0; }
+    .remarks-board { background-color: #f8f9fa; border-left: 4px solid var(--primary-hover); padding: 1rem; margin-top: 1rem; border-radius: 4px; color: #343a40; white-space: pre-wrap; }
+    #looker-studio-container, #handover-board-container, #presentation-container, #presentation-container-2, #presentation-container-3 { display: none; width: 100%; }
+    #looker-studio-container iframe, #handover-board-container iframe, #presentation-container iframe, #presentation-container-2 iframe, #presentation-container-3 iframe { width: 100%; height: 80vh; border: none; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+
+    .editor-only, .admin-only { display: none !important; }
+    body.role-editor .editor-only,
+    body.role-admin .editor-only,
+    body.role-admin .admin-only { display: block !important; }
+
+    /* --- NEW: Infographic Grid Styles --- */
+    .infographic-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(48%, 1fr));
+      gap: 2rem;
+    }
+    
+  </style>
+  <script>
+    google.charts.load('current', {'packages':['corechart']});
+    google.charts.setOnLoadCallback(initializeApp);
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        const menuToggle = document.getElementById('menu-toggle');
+        const sidebar = document.getElementById('sidebar');
+        menuToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('collapsed');
+            document.getElementById('page-content-wrapper').classList.toggle('collapsed');
+        });
+
+        const dropdowns = document.querySelectorAll('.dropdown-toggle');
+        dropdowns.forEach(dropdown => {
+            dropdown.addEventListener('click', function(e) {
+                e.preventDefault();
+                this.parentElement.classList.toggle('active');
+            });
+        });
+
+        // Add event listeners to new sidebar navigation links (client filter removed)
+        document.querySelectorAll('#sidebar [data-chart-id], #sidebar [data-view]').forEach(link => {
+            link.addEventListener('click', handleSidebarClick);
+        });
+
+        // Add event listener for sidebar search
+        document.getElementById('sidebar-search-form').addEventListener('submit', onSearch);
+    });
+
+  function handleSidebarClick(event) {
+        event.preventDefault();
+        const target = event.currentTarget;
+        const chartId = target.dataset.chartId;
+        const viewId = target.dataset.view;
+
+        if (viewId) {
+      setCurrentView({ type: 'view', id: viewId });
+      if (viewId === 'looker') showLookerStudio();
+      if (viewId === 'handover') showHandoverBoard();
+      if (viewId === 'presentation') showPresentation();
+      if (viewId === 'presentation-2') showPresentation2();
+      if (viewId === 'presentation-3') showPresentation3();
+      if (viewId === 'infographic') drawInfographic(); // NEW: Handle infographic view
+        } else if (chartId) {
+      setCurrentView({ type: 'chart', id: chartId });
+      drawSelectedChart(chartId);
+        }
+    }
+    
+  function onSearch(event) {
+    event.preventDefault();
+    triggerSearch();
+  }
+
+  // Debounced sidebar search
+  let searchTimer = null;
+  function triggerSearch() {
+    const campaignType = document.getElementById('sidebarSearchInput').value.trim();
+    if (!campaignType) { return; }
+    _updateView('loading', 'Searching campaigns...');
+    google.script.run.withSuccessHandler(displaySearchResults).withFailureHandler(handleError).searchCampaignByType(campaignType);
+  }
+  // Hook input for instant search with debounce
+  document.addEventListener('DOMContentLoaded', () => {
+    const input = document.getElementById('sidebarSearchInput');
+    if (input) {
+      input.addEventListener('input', () => {
+        if (searchTimer) clearTimeout(searchTimer);
+        searchTimer = setTimeout(triggerSearch, 450);
+      });
+    }
+  });
+    
+    let dashboardData = {};
+    let currentUser = { role: 'guest' };
+    let uiElements;
+    const currentMonthName = new Date().toLocaleString('default', { month: 'long' });
+
+    const chartConfig = {
+        campaignStatusCounts: { draw: drawPieChart, options: { title: 'Campaigns by Status', isDonut: true } },
+        campaignDurations: { draw: drawBarChart, options: { title: 'Top 5 Campaign Duration by Type', vAxisTitle: 'Campaign Type', hAxisTitle: 'Total Duration (Days)', type: 'BAR', isStacked: false } },
+        currentMonthBudgets: { draw: drawBarChart, options: { title: `Meta Budget in ${currentMonthName}`, vAxisTitle: 'Ad Format', hAxisTitle: 'Total Meta Budget', type: 'BAR', isStacked: false } },
+        frequencyByClient: { draw: drawPieChart, options: { title: 'Total Meta Budget by Client & Platform', isDonut: true } },
+        monthlyBudgetByClient: { draw: drawBarChart, options: { title: `Meta Budget by Client in ${currentMonthName}`, vAxisTitle: 'Client', hAxisTitle: 'Total Meta Budget', type: 'COLUMN', isStacked: false } },
+        platformClientCounts: { draw: drawBarChart, options: { title: 'Platform by Client', vAxisTitle: 'Client', hAxisTitle: 'Total Meta Budget', type: 'BAR', isStacked: true } }
+    };
+
+   
+    function initializeApp() {
+        uiElements = {
+            mainContent: document.getElementById('main-content'),
+            mainContainer: document.getElementById('main-container'), loginOverlay: document.getElementById('login-overlay'),
+            loginButton: document.getElementById('login-button'), loginError: document.getElementById('login-error'),
+            loading: document.getElementById('loading'), loadingText: document.getElementById('loading-text'),
+            errorMessage: document.getElementById('error-message'),
+            welcomeContainer: document.getElementById('welcome-message-container'), dashboardContent: document.getElementById('dashboard-content'),
+            searchResultsContainer: document.getElementById('search-results-container'), 
+            lookerStudioContainer: document.getElementById('looker-studio-container'),
+            handoverBoardContainer: document.getElementById('handover-board-container'),
+            presentationContainer: document.getElementById('presentation-container'),
+            presentationContainer2: document.getElementById('presentation-container-2'),
+            presentationContainer3: document.getElementById('presentation-container-3'),
+            chartDisplay: document.getElementById('chartDisplay'),
+            entryInput: document.getElementById('entry-input'),
+            infographicContainer: document.getElementById('infographic-container') // NEW: Add infographic container element
+        };
+         uiElements.loginButton.addEventListener('click', verifyUser);
+
+
+        if (!uiElements) { 
+            setTimeout(initializeApp, 50);
+            return;
+        }
+        uiElements.mainContainer.style.display = 'none';
+        google.script.run.withSuccessHandler(isAuthorized => {
+            if (isAuthorized) {
+                runDashboard();
+            } else {
+                uiElements.loginOverlay.style.display = 'flex';
+            }
+        }).checkUserAccess();
+    }
+
+    function verifyUser() {
+        uiElements.loginButton.disabled = true;
+        uiElements.loginButton.textContent = 'Verifying...';
+        google.script.run.withSuccessHandler(handleLoginResult).withFailureHandler(handleError).checkUserAccess();
+    }
+
+    function handleLoginResult(isAuthorized) {
+        if (isAuthorized) {
+            uiElements.loginOverlay.style.display = 'none';
+            runDashboard();
+        } else {
+            uiElements.loginError.textContent = 'Access Denied. Please check permissions with an administrator.';
+            uiElements.loginButton.disabled = false;
+            uiElements.loginButton.textContent = 'Login with Google';
+        }
+    }
+
+  function _updateView(viewToShow, message = '') {
+        // NEW: Add 'infographic' to the list of views
+        const views = { loading: uiElements.loading, welcome: uiElements.welcomeContainer, dashboard: uiElements.dashboardContent, search: uiElements.searchResultsContainer, error: uiElements.errorMessage, looker: uiElements.lookerStudioContainer, handover: uiElements.handoverBoardContainer, presentation: uiElements.presentationContainer, presentation2: uiElements.presentationContainer2, presentation3: uiElements.presentationContainer3, infographic: uiElements.infographicContainer };
+        uiElements.mainContainer.style.display = 'block';
+        Object.values(views).forEach(view => view.style.display = 'none');
+        if (viewToShow === 'loading') { uiElements.loadingText.textContent = message || 'loading......'; }
+        if (views[viewToShow]) { views[viewToShow].style.display = 'block'; }
+    }
+    
+    function showLookerStudio() { _updateView('looker'); }
+    function showHandoverBoard() { _updateView('handover'); }
+    function showPresentation() { _updateView('presentation'); }
+    function showPresentation2() { _updateView('presentation2'); }
+    function showPresentation3() { _updateView('presentation3'); }
+
+    function runDashboard() {
+      _updateView('loading', 'loading......');
+      google.script.run.withSuccessHandler(onDataLoad).withFailureHandler(handleError).getDashboardData();
+    }
+
+    function onDataLoad(data) {
+      if (data.error) return handleError(data.error);
+      dashboardData = data;
+      if (data.userRole) {
+        currentUser.role = data.userRole;
+        document.body.className = `role-${currentUser.role}`;
+      }
+      if (data.userName) {
+        const welcomeHeader = uiElements.welcomeContainer.querySelector('.welcome-message');
+        if (welcomeHeader) { welcomeHeader.textContent = `Welcome, ${data.userName}!`; }
+      }
+      setupEventListeners();
+      restoreLastViewOrWelcome();
+    }
+
+    // Persist and restore view
+    const LAST_VIEW_KEY = 'app3_last_view';
+    function setCurrentView(v) {
+      try { localStorage.setItem(LAST_VIEW_KEY, JSON.stringify(v)); } catch(_){}
+    }
+    function restoreLastViewOrWelcome() {
+      let v = null;
+      try { v = JSON.parse(localStorage.getItem(LAST_VIEW_KEY) || 'null'); } catch(_){}
+      if (!v) { _updateView('welcome'); return; }
+      if (v.type === 'chart' && v.id) return drawSelectedChart(v.id);
+      if (v.type === 'view' && v.id) {
+        if (v.id === 'infographic') return drawInfographic();
+        if (v.id === 'looker') return showLookerStudio();
+        if (v.id === 'handover') return showHandoverBoard();
+        if (v.id === 'presentation') return showPresentation();
+        if (v.id === 'presentation-2') return showPresentation2();
+        if (v.id === 'presentation-3') return showPresentation3();
+      }
+      _updateView('welcome');
+    }
+
+    // Redraw on resize / visibility
+    let redrawTimer = null;
+    function scheduleRedraw() {
+      if (redrawTimer) clearTimeout(redrawTimer);
+      redrawTimer = setTimeout(() => {
+        let v = null;
+        try { v = JSON.parse(localStorage.getItem(LAST_VIEW_KEY) || 'null'); } catch(_){}
+        if (!v) return;
+        if (v.type === 'chart' && v.id) return drawSelectedChart(v.id);
+        if (v.type === 'view' && v.id === 'infographic') return drawInfographic();
+      }, 250);
+    }
+    window.addEventListener('resize', scheduleRedraw);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') scheduleRedraw(); });
+
+    function setupEventListeners() {
+      if (uiElements.entryInput) {
+          uiElements.entryInput.addEventListener('keypress', function(event) {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                submitEntryCode();
+              }
+          });
+      }
+    }
+    
+    function submitEntryCode() {
+        const code = uiElements.entryInput.value.trim();
+        if (!code) { alert('Please enter a code to submit.'); return; }
+        
+        uiElements.entryInput.disabled = true;
+
+        google.script.run
+            .withSuccessHandler(result => {
+                alert(result.message);
+                uiElements.entryInput.value = '';
+                uiElements.entryInput.disabled = false;
+            })
+            .withFailureHandler(error => {
+                alert(`Error: ${error.message}`);
+                uiElements.entryInput.disabled = false;
+            })
+            .appendCodeToSheet(code);
+    }
+    
+  function displaySearchResults(results) {
+        const container = uiElements.searchResultsContainer;
+        container.innerHTML = '';
+        if (!results || results.length === 0) {
+            container.innerHTML = '<p class="no-data-message">No campaigns found with that type.</p>';
+        } else {
+            const fragment = document.createDocumentFragment();
+      const fmt = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+            results.forEach(row => {
+                const resultDiv = document.createElement('div');
+                resultDiv.className = 'search-result';
+                const guideButtonHtml = row.guideLink ? `<br><a href="${row.guideLink}" target="_blank" class="btn btn-light" style="margin-top: 1rem;">Download Guide</a>` : '';
+                const remarksHtml = row.remarks ? `<div class="remarks-board"><b>Remarks:</b><br>${row.remarks}</div>` : '';
+        const budgetStr = (row.budget != null && row.budget !== '') ? fmt.format(Number(row.budget) || 0) : fmt.format(0);
+                resultDiv.innerHTML = `
+                    <b>Campaign ID:</b> ${row.id || 'NA'}
+<br>
+                    <b>Client:</b> ${row.client || 'N/A'}<br>
+                    <b>Platform:</b> ${row.platform || 'N/A'}<br>
+                    <b>Campaign Type:</b> ${row.campaignType || 'N/A'}<br>
+          <b>Meta Budget:</b> ${budgetStr}<br>
+                    <b>Start Date:</b> ${row.startDate || 'N/A'}<br>
+                    <b>End Date:</b> ${row.endDate || 'N/A'}
+                    ${remarksHtml} ${guideButtonHtml}`;
+                fragment.appendChild(resultDiv);
+            });
+            container.appendChild(fragment);
+        }
+        _updateView('search');
+    }
+    
+    function drawSelectedChart(chartId) {
+      _updateView('dashboard');
+      let chartData = dashboardData.charts[chartId];
+      const chartDisplay = uiElements.chartDisplay;
+      chartDisplay.dataset.currentChart = chartId;
+      const originalConfig = chartConfig[chartId];
+      if (!originalConfig) return handleError(`Unknown chart ID: ${chartId}`);
+      const config = { ...originalConfig, options: JSON.parse(JSON.stringify(originalConfig.options || {})) };
+      
+      chartDisplay.innerHTML = '';
+      if (!chartData || chartData.length <= 1) {
+        chartDisplay.innerHTML = '<div class="no-data-message">No data to display for this selection.</div>';
+        return;
+      }
+      if (config.draw) {
+        config.draw({ elementId: 'chartDisplay', dataArray: chartData, ...config.options });
+      } else {
+        handleError(`Configuration for chart ID '${chartId}' is missing a 'draw' function.`);
+      }
+    }
+    
+    // --- NEW: Function to draw all infographic charts ---
+    function drawInfographic() {
+        _updateView('infographic');
+        const chartsToDraw = {
+            'infographic-status': 'campaignStatusCounts',
+            'infographic-duration': 'campaignDurations',
+            'infographic-budget': 'currentMonthBudgets',
+            'infographic-client-budget': 'monthlyBudgetByClient'
+        };
+
+        for (const [elementId, chartId] of Object.entries(chartsToDraw)) {
+            const element = document.getElementById(elementId);
+            const chartData = dashboardData.charts[chartId];
+            const config = chartConfig[chartId];
+
+            if (chartData && chartData.length > 1 && config && config.draw) {
+                config.draw({ elementId, dataArray: chartData, ...config.options });
+            } else {
+                element.innerHTML = `<div class="no-data-message">No data for ${config.options.title || 'this chart'}.</div>`;
+            }
+        }
+    }
+
+    function drawPieChart({ elementId, dataArray, title, isDonut = false }) {
+      const data = google.visualization.arrayToDataTable(dataArray);
+      const options = { title, titleTextStyle: { fontSize: 16, bold: true }, pieHole: isDonut ? 0.4 : 0, colors: ['#4CAF50', '#FFC107', '#F44336', '#9E9E9E', '#2196F3'] };
+      new google.visualization.PieChart(document.getElementById(elementId)).draw(data, options);
+    }
+    
+    function drawBarChart({ elementId, dataArray, title, vAxisTitle, hAxisTitle, type, isStacked = false }) {
+      const data = google.visualization.arrayToDataTable(dataArray);
+      const options = { title, titleTextStyle: { fontSize: 16, bold: true }, hAxis: { title: hAxisTitle, format: 'short' }, vAxis: { title: vAxisTitle }, legend: { position: isStacked ? 'top' : 'none' }, chartArea: { width: '70%', height: '70%' }, isStacked, colors: ['#FF5722', '#F4511E', '#E64A19', '#D84315', '#BF360C'] };
+      const chart = (type === 'COLUMN') ? new google.visualization.ColumnChart(document.getElementById(elementId)) : new google.visualization.BarChart(document.getElementById(elementId));
+      chart.draw(data, options);
+    }
+
+    function handleError(error) {
+      const message = typeof error === 'string' ? error : (error && error.message ? error.message : 'An unknown error occurred.');
+      console.error(error);
+      uiElements.errorMessage.setAttribute('role', 'alert');
+      uiElements.errorMessage.setAttribute('tabindex', '-1');
+      uiElements.errorMessage.textContent = `Error: ${message}. Please reload the page.`;
+      _updateView('error');
+      setTimeout(() => { try { uiElements.errorMessage.focus(); } catch(_){} }, 50);
+    }
+  </script>
+</head>
+<body>
+  <div id="login-overlay" style="display: none;">
+    <div id="login-box">
+      <h2>Ad Ops Hub Access</h2>
+      <p>Please sign in to continue.</p>
+      <button id="login-button" class="btn btn-primary">Login with Google</button>
+      <p id="login-error"></p>
+    </div>
+  </div>
+
+  <button id="menu-toggle">☰</button>
+
+  <div id="sidebar">
+    <div id="sidebar-content">
+      <h2><i class="fas fa-cogs"></i> Ad Ops Hub</h2>
+      
+      <div class="nav-group editor-only">
+        <div class="nav-group-title">Analytics</div>
+        <a href="#" data-view="infographic"><i class="fas fa-tachometer-alt"></i> Overview</a>
+        <div class="dropdown-container">
+          <a href="#" class="dropdown-toggle"><i class="fas fa-chart-pie"></i> Individual Charts</a>
+          <div class="dropdown-content">
+            <a href="#" data-chart-id="campaignDurations">Campaign Duration</a>
+            <a href="#" data-chart-id="campaignStatusCounts">Campaign Status</a>
+            <a href="#" data-chart-id="currentMonthBudgets">Meta Budget This Month</a>
+            <a href="#" data-chart-id="monthlyBudgetByClient">Monthly Budget by Client</a>
+            <a href="#" data-chart-id="frequencyByClient">Frequency by Client</a>
+            <a href="#" data-chart-id="platformClientCounts">Platform by Client</a>
+          </div>
+        </div>
+        <div class="dropdown-container">
+          <a href="#" class="dropdown-toggle"><i class="fas fa-chart-line"></i> Dashboards</a>
+          <div class="dropdown-content">
+            <a href="#" data-view="looker">Looker Studio (Internal)</a>
+            <a href="https://lookerstudio.google.com/u/0/reporting/4c6dbca8-0921-446f-a5ea-0a8a20593af9/page/p_fj0bwnkdrd" target="_blank">SA-SA Report (External)</a>
+          </div>
+        </div>
+        <div class="dropdown-container">
+          <a href="#" class="dropdown-toggle"><i class="fas fa-book"></i> Training Decks</a>
+          <div class="dropdown-content">
+            <a href="#" data-view="presentation">Note SA-SA</a>
+            <a href="#" data-view="presentation-2">IMS Request</a>
+            <a href="#" data-view="presentation-3">NYMG</a>
+          </div>
+        </div>
+         <a href="#" data-view="handover"><i class="fas fa-clipboard-check"></i> Handover board</a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-title">External Links</div>
+        <a href="https://ads.google.com/" target="_blank"><i class="fab fa-google"></i> Google Ads</a>
+        <a href="https://adsmanager.facebook.com/" target="_blank"><i class="fab fa-facebook"></i> Meta Ad Manager</a>
+        <a href="https://ads.microsoft.com/" target="_blank"><i class="fab fa-microsoft"></i> Bings</a>
+        <a href="https://authentication.taboola.com/authentication/login" target="_blank"><i class="fas fa-bullhorn"></i> Taboola</a>
+        <a href="https://app.coupler.io/app/dataflows/742adb94-031a-11f0-b9d8-236dcd345ef0/edit?step=settings" target="_blank"><i class="fas fa-bullhorn"></i> Coupler</a>
+      </div>
+      
+      <div class="nav-group admin-only">
+        <div class="nav-group-title">Admin</div>
+        <a href="https://docs.google.com/spreadsheets/d/1TI2-pV3IYe4kr56BB9vZTtZQ_hgpIo0DoSrQKBunrz4/edit" target="_blank"><i class="fas fa-table"></i> Data Table</a>
+        <input type="text" id="entry-input" class="entry-input" placeholder="Enter Code to Submit...">
+      </div>
+      
+      <div class="nav-group editor-only">
+        <div class="nav-group-title">Campaign Search</div>
+        <form id="sidebar-search-form">
+            <input type="text" id="sidebarSearchInput" class="search-input" placeholder="Enter Campaign Type...">
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div id="page-content-wrapper">
+    <div class="container">
+      <div id="main-container" style="display: none;">
+        <div id="main-content">
+          <div class="header"><h1>Ad Ops Hub</h1><p>A real-time dashboard for campaign monitoring.</p></div>
+          <div id="loading" class="chart-card"><h2 id="loading-text">loading......</h2></div>
+          <div id="error-message" class="chart-card" style="display: none; color: #D32F2F;"></div>
+          <div id="welcome-message-container" class="chart-card" style="display: none;"><h2 class="welcome-message">Welcome</h2></div>
+          <div id="dashboard-content" style="display: none;"><div id="chartDisplay" class="chart-card"></div></div>
+          <div id="search-results-container" style="display:none;"></div>
+          
+          <div id="infographic-container" class="infographic-grid" style="display: none;">
+              <div id="infographic-status" class="chart-card"></div>
+              <div id="infographic-duration" class="chart-card"></div>
+              <div id="infographic-budget" class="chart-card"></div>
+              <div id="infographic-client-budget" class="chart-card"></div>
+          </div>
+        </div>
+        
+        <div id="looker-studio-container">
+          <iframe src="https://lookerstudio.google.com/embed/reporting/6043ee85-4e87-43ec-bc51-d36850d0d591/page/Da7VF" frameborder="0" style="border:0" allowfullscreen></iframe>
+        </div>
+        <div id="handover-board-container">
+          <iframe src="https://glen-jam-468.notion.site/ebd/262e32ef93cc80d2b850efb6ea696999?v=262e32ef93cc805c8b53000c422225ab" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <div id="presentation-container">
+          <iframe src="https://docs.google.com/presentation/d/e/2PACX-1vSXWtbgEzQk05HtT1e6theOzJMyu_v1oh6mi-gg49o3a-0EBTIMTrOuFyBjB8MsDXllIt2MC8QTXXj2/pubembed?start=true&loop=false&delayms=3000" frameborder="0" allowfullscreen="true" mozallowfullscreen="true" webkitallowfullscreen="true"></iframe>
+        </div>
+         <div id="presentation-container-2">
+          <iframe src="https://docs.google.com/presentation/d/e/2PACX-1vRlDJ7FGQjn4XxHXn6CruNbD023W4q0hI07IQmglN5ug_CR33ffSwn4F78xMiH5_fJoaacO-eVewztn/pubembed?start=true&loop=false&delayms=3000" frameborder="0" allowfullscreen="true" mozallowfullscreen="true" webkitallowfullscreen="true"></iframe>
+        </div>
+        <div id="presentation-container-3">
+          <iframe src="https://docs.google.com/presentation/d/e/2PACX-1vSU_Gy2KsdZGfvR6mAAnqYoFotrxp10_afECxAbwPgg1PA13f37z4CjaNj59C8tR0Jzh8pQ61g31iFT/pubembed?start=true&loop=false&delayms=3000" frameborder="0" allowfullscreen="true" mozallowfullscreen="true" webkitallowfullscreen="true"></iframe>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
