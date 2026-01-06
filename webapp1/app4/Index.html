@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>App 4</title>
+  <style>
+    :root {
+      --primary-color: #003366;
+      --primary-hover: #004d99;
+      --background-main: #f0f2f5;
+      --background-card: #ffffff;
+      --text-dark: #000000;
+      --muted: #6c757d;
+      --border-color: #e9ecef;
+    }
+
+    body {
+      font-family: 'Segoe UI', 'Roboto', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: var(--background-main);
+      color: var(--text-dark);
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin: 0 0 0.25rem;
+      color: var(--primary-color);
+    }
+
+    .header p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .card {
+      background-color: var(--background-card);
+      padding: 1.25rem;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .input {
+      flex: 1 1 220px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      font-size: 1rem;
+    }
+
+    .btn {
+      padding: 10px 14px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      background: var(--primary-hover);
+      color: white;
+      transition: background-color 0.2s ease;
+    }
+
+    .btn:hover { background-color: var(--primary-color); }
+
+    .status {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: #f8f9fa;
+      border: 1px solid var(--border-color);
+      color: #343a40;
+      white-space: pre-wrap;
+      min-height: 44px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>App 4</h1>
+      <p>Minimal scaffold (HTML + JS)</p>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <input id="nameInput" class="input" placeholder="Type something…" />
+        <button id="runBtn" class="btn" type="button">Run</button>
+      </div>
+
+      <div id="status" class="status" aria-live="polite"></div>
+    </div>
+  </div>
+
+  <script src="code.js"></script>
+</body>
+</html>
