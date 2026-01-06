@@ -13,6 +13,11 @@ const COLUMNS = {
 };
 // --- END CONFIGURATION ---
 
+// --- CACHE CONFIG ---
+const CACHE_EXP_SECONDS = 60; // cache heavy aggregations for 60s
+const CACHE_KEY_DASHBOARD = 'APP1_DASHBOARD_V1';
+const CACHE_KEY_SEARCH_PREFIX = 'APP1_SEARCH_CT_';
+
 function doGet() {
   return HtmlService.createHtmlOutputFromFile('Index').setTitle('Progress Hub -- Ads Ops');
 }
@@ -20,30 +25,70 @@ function doGet() {
 function _getSheetData() {
   const sourceSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SOURCE_SHEET_NAME);
   if (!sourceSheet) return { error: `Source sheet "${SOURCE_SHEET_NAME}" not found.` };
-  const data = sourceSheet.getDataRange().getValues();
-  data.shift(); // Remove header row
+
+  const lastRow = sourceSheet.getLastRow();
+  if (lastRow <= 1) return { data: [] };
+
+  // Read only the columns we actually use (still returns 0-indexed arrays).
+  const maxCol = Math.max.apply(null, Object.values(COLUMNS));
+  const width = maxCol + 1;
+  const data = sourceSheet.getRange(1, 1, lastRow, width).getValues();
+  data.shift();
   return { data };
 }
 
 function getDashboardData() {
+  const cache = CacheService.getDocumentCache();
+  try {
+    const hit = cache.get(CACHE_KEY_DASHBOARD);
+    if (hit) return JSON.parse(hit);
+  } catch (_) {
+    // ignore cache errors
+  }
+
   const { data, error } = _getSheetData();
   if (error) return { error };
-  return { charts: processDataForCharts(data) };
+
+  const payload = { charts: processDataForCharts(data) };
+  try { cache.put(CACHE_KEY_DASHBOARD, JSON.stringify(payload), CACHE_EXP_SECONDS); } catch (_) {}
+  return payload;
 }
 
 function searchCampaignByType(campaignType) {
   const { data, error } = _getSheetData();
   if (error) return { error };
-  
-  return data
-    .filter(row => row[COLUMNS.CAMPAIGN_TYPE] && String(row[COLUMNS.CAMPAIGN_TYPE]).toUpperCase().includes(campaignType.toUpperCase()))
+
+  const needle = String(campaignType || '').trim().toUpperCase();
+  if (!needle) return [];
+
+  const cache = CacheService.getDocumentCache();
+  const ck = CACHE_KEY_SEARCH_PREFIX + needle;
+  try {
+    const hit = cache.get(ck);
+    if (hit) return JSON.parse(hit);
+  } catch (_) {
+    // ignore cache errors
+  }
+
+  const results = data
+    .filter(row => row[COLUMNS.CAMPAIGN_TYPE] && String(row[COLUMNS.CAMPAIGN_TYPE]).toUpperCase().includes(needle))
     .map(row => ({
       id: row[COLUMNS.CAMPAIGN_ID], client: row[COLUMNS.CLIENT], platform: row[COLUMNS.PLATFORM],
       campaignType: row[COLUMNS.CAMPAIGN_TYPE], status: row[COLUMNS.STATUS], budget: row[COLUMNS.META_BUDGET],
       startDate: Utilities.formatDate(new Date(row[COLUMNS.START_DATE]), "GMT", "yyyy-MM-dd"),
       endDate: Utilities.formatDate(new Date(row[COLUMNS.END_DATE]), "GMT", "yyyy-MM-dd")
     }))
-    .sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
+
+  const sorted = results.sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
+  try { cache.put(ck, JSON.stringify(sorted.slice(0, 300)), 30); } catch (_) {}
+  return sorted;
+}
+
+function invalidateDashboardCache() {
+  try {
+    const cache = CacheService.getDocumentCache();
+    cache.remove(CACHE_KEY_DASHBOARD);
+  } catch (_) {}
 }
 
 function processDataForCharts(data) {
@@ -125,6 +170,9 @@ function dailyDataRefresh() {
     snapshotSheet.clear();
     snapshotSheet.getRange(1, 1, sourceData.length, sourceData[0].length).setValues(sourceData);
     Logger.log(`Data refresh complete. Copied ${sourceData.length} rows.`);
+
+    // Underlying data changed; clear cached dashboard results.
+    invalidateDashboardCache();
   } catch (e) {
     Logger.log(`An error occurred: ${e.message}`);
   }

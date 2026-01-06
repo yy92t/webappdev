@@ -1,28 +1,42 @@
 (() => {
-  function byId(id) {
+  const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'medium',
+  });
+
+  /** @type {{ statusEl: HTMLElement, inputEl: HTMLInputElement, runBtn: HTMLElement } | null} */
+  let dom = null;
+
+  function mustGetById(id) {
     const el = document.getElementById(id);
     if (!el) throw new Error(`Missing element: ${id}`);
     return el;
   }
 
   function setStatus(message) {
-    byId('status').textContent = message;
+    dom.statusEl.textContent = message;
   }
 
   function run() {
-    const value = byId('nameInput').value.trim();
+    const value = dom.inputEl.value.trim();
     if (!value) {
       setStatus('Enter a value, then click Run.');
       return;
     }
 
     const now = new Date();
-    setStatus(`You entered: ${value}\nTime: ${now.toLocaleString()}`);
+    setStatus(`You entered: ${value}\nTime: ${dateTimeFormatter.format(now)}`);
   }
 
   document.addEventListener('DOMContentLoaded', () => {
-    byId('runBtn').addEventListener('click', run);
-    byId('nameInput').addEventListener('keydown', (e) => {
+    dom = {
+      statusEl: mustGetById('status'),
+      inputEl: /** @type {HTMLInputElement} */ (mustGetById('nameInput')),
+      runBtn: mustGetById('runBtn'),
+    };
+
+    dom.runBtn.addEventListener('click', run);
+    dom.inputEl.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') run();
     });
 
