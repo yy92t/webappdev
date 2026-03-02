@@ -1,0 +1,131 @@
+// Google Sheet URL where data will be appended to "Sheet2" [cite: 1]
+var SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1sxGFbLbdVFq3Ls8jjyEmQzq5jdH6hmZGHj0c5-HwsbA/edit?usp=sharing';
+
+// --- NEW: Add your GitHub Raw File URL here ---
+// Important: It must be the "Raw" version of the URL, not the standard GitHub page.
+var GITHUB_RAW_URL = 'https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/account_ids.txt';
+
+function main() {
+  var spreadsheet = SpreadsheetApp.openByUrl(SPREADSHEET_URL); [cite: 2]
+  var sheet = spreadsheet.getSheetByName("Sheet2"); [cite: 2]
+
+  // Optional: add headers only if the sheet is empty [cite: 3]
+  if (sheet.getLastRow() == 0) { [cite: 3]
+    sheet.appendRow(["Day", "Account", "Customer ID", "Account Labels", "Clicks", "Impr.", "CTR", "Avg. CPC", "Cost", "Video Views"]); [cite: 3]
+  } [cite: 4]
+
+  // --- NEW: Fetch and parse Account IDs from GitHub ---
+  Logger.log("Fetching account IDs from GitHub...");
+  var response = UrlFetchApp.fetch(GITHUB_RAW_URL);
+  var fileContent = response.getContentText();
+  
+  // Split by new line, trim whitespace, and filter out empty lines
+  var accountIdsArray = fileContent.split('\n')
+    .map(function(id) { return id.trim(); })
+    .filter(function(id) { return id.length > 0; });
+    
+  Logger.log("Successfully loaded " + accountIdsArray.length + " account IDs from GitHub.");
+
+  // --- PERFORMANCE UPDATE: Create an array to batch-write data to Google Sheets --- [cite: 4]
+  var rowsToAppend = []; [cite: 4]
+
+  // Filter for specific child account IDs from GitHub and ensure it is active 
+  var accountSelector = AdsManagerApp.accounts()
+    .withIds(accountIdsArray) // <-- Now uses the dynamic array from GitHub instead of the hardcoded ID
+    .withCondition("customer_client.status = 'ENABLED'"); [cite: 5]
+  var accountIterator = accountSelector.get(); [cite: 6]
+
+  // Calculate yesterday's date in GMT+8 [cite: 6]
+  var now = new Date(); [cite: 6]
+  var gmt8 = new Date(now.getTime() + (8 * 60 * 60 * 1000)); [cite: 7]
+  var yesterday = new Date(gmt8.getTime() - (24 * 60 * 60 * 1000)); [cite: 8]
+  var dayFormatted = Utilities.formatDate(yesterday, "GMT+8", "yyyy-MM-dd"); [cite: 8]
+  var queryDate = Utilities.formatDate(yesterday, "PST", "yyyyMMdd"); // For API report [cite: 9]
+
+  while (accountIterator.hasNext()) {
+    var account = accountIterator.next();
+
+    // --- PERFORMANCE UPDATE: Optimized Label Checking --- [cite: 10]
+    var hasTargetLabel = false; [cite: 10]
+    
+    // 1. Check Manager (MCC) level labels first [cite: 11]
+    var mccLabelIterator = account.labels().get(); [cite: 11]
+    while (mccLabelIterator.hasNext()) { [cite: 12]
+      if (mccLabelIterator.next().getName() === '.DGO_Winsome') { [cite: 12]
+        hasTargetLabel = true; [cite: 12]
+        break; // Stop searching immediately if found [cite: 13]
+      }
+    }
+    
+    // Switch context to the child account to run reports & check account-level labels
+    AdsManagerApp.select(account);
+    
+    // 2. If NOT found at MCC level, check natively inside the child account [cite: 14]
+    if (!hasTargetLabel) { [cite: 14]
+      var accountLabelIterator = AdsApp.labels().get(); [cite: 14]
+      while (accountLabelIterator.hasNext()) { [cite: 15]
+        if (accountLabelIterator.next().getName() === '.DGO_Winsome') { [cite: 15]
+          hasTargetLabel = true; [cite: 15]
+          break; // Stop searching immediately if found [cite: 16]
+        }
+      }
+    }
+    
+    // --- Filter by specific label ---
+    // If the account doesn't have the '.DGO_Winsome' label, skip processing it
+    if (!hasTargetLabel) {
+      Logger.log("Account " + account.getCustomerId() + " skipped. Missing label: .DGO_Winsome");
+      continue; [cite: 17]
+    }
+    
+    // UPDATE: Only show the specific label in the spreadsheet instead of all labels
+    var labelsString = '.DGO_Winsome';
+    
+    // Added logging to troubleshoot label extraction in the Logs tab [cite: 18]
+    Logger.log("Account ID: " + account.getCustomerId() + " | Extracted Labels: [" + labelsString + "]"); [cite: 18]
+    var accountName = account.getName(); [cite: 19]
+    var accountId = account.getCustomerId(); [cite: 19]
+
+    var report = AdsApp.report(
+      "SELECT Clicks, Impressions, Ctr, AverageCpc, Cost, VideoViews " +
+      "FROM ACCOUNT_PERFORMANCE_REPORT " +
+      "WHERE Date = '" + queryDate + "'"
+    ); [cite: 19]
+    
+    var rows = report.rows(); [cite: 20]
+    while (rows.hasNext()) { [cite: 20]
+      var row = rows.next(); [cite: 20]
+      
+      // Fix: Remove commas from the cost string before parsing so "1,234.56" doesn't become "1" [cite: 21]
+      var costString = row['Cost'] ? [cite: 21]
+        row['Cost'].toString().replace(/,/g, '') : "0"; [cite: 22]
+      var cost = parseFloat(costString); [cite: 22]
+      
+      // Temporarily changed to >= 0 so that it outputs the row even if yesterday's cost was $0
+      if (cost >= 0) {
+        // --- PERFORMANCE UPDATE: Store row in memory instead of writing to Sheet immediately ---
+        rowsToAppend.push([
+          dayFormatted,
+          accountName,
+          accountId,
+          labelsString, [cite: 23]
+          row['Clicks'], [cite: 23]
+          row['Impressions'], [cite: 23]
+          row['Ctr'], [cite: 23]
+          row['AverageCpc'], [cite: 23]
+          row['Cost'], [cite: 23]
+          row['VideoViews'] [cite: 23]
+        ]);
+      } [cite: 24]
+    }
+  }
+  
+  // --- PERFORMANCE UPDATE: Write all collected data to Google Sheets at once --- [cite: 24]
+  if (rowsToAppend.length > 0) { [cite: 24]
+    var startRow = sheet.getLastRow() + 1; [cite: 24]
+    sheet.getRange(startRow, 1, rowsToAppend.length, rowsToAppend[0].length).setValues(rowsToAppend); [cite: 25]
+    Logger.log("Successfully appended " + rowsToAppend.length + " rows to the spreadsheet."); [cite: 25]
+  } else { [cite: 26]
+    Logger.log("No data to append for yesterday."); [cite: 26]
+  } [cite: 26]
+}
