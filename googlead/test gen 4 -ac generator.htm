@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Name Generator & Logger</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background-color: #f0f2f5; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 800px; width: 100%; }
+        h2 { color: #1a73e8; margin-top: 0; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .input-group { display: flex; flex-direction: column; }
+        label { font-size: 11px; font-weight: 700; color: #5f6368; margin-bottom: 4px; text-transform: uppercase; }
+        input { padding: 8px; border: 1px solid #dadce0; border-radius: 4px; font-size: 14px; }
+        
+        input[type="date"] { font-family: inherit; color: #333; }
+        
+        .result-area { background: #e8f0fe; border-left: 5px solid #1a73e8; padding: 15px; border-radius: 4px; margin: 20px 0; }
+        #outputString { font-family: monospace; font-weight: bold; font-size: 15px; color: #174ea6; word-break: break-all; }
+        .actions { display: flex; gap: 10px; }
+        button { flex: 1; padding: 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn-copy { background: #1a73e8; color: white; }
+        .btn-download { background: #5f6368; color: white; margin-top: 20px; }
+        button:hover { opacity: 0.9; }
+        
+        /* Auto-save notification animation */
+        .save-indicator { font-size: 12px; color: #34a853; font-weight: bold; display: none; margin-top: 5px; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f8f9fa; }
+        .history-section { margin-top: 30px; width: 100%; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Account Name Generator</h2>
+    
+    <div class="grid">
+        <div class="input-group">
+            <label>Agreement No.</label>
+            <input type="text" id="agr" placeholder="AGR-001" oninput="generate()">
+        </div>
+        <div class="input-group">
+            <label>Account Name</label>
+            <input type="text" id="acc" placeholder="Brand" oninput="generate()">
+        </div>
+        <div class="input-group">
+            <label>Channel / AdType</label>
+            <input type="text" id="chan" placeholder="Social-Video" oninput="generate()">
+        </div>
+        <div class="input-group">
+            <label>KPI Metrics</label>
+            <input type="text" id="kpi" placeholder="CPA" oninput="generate()">
+        </div>
+        <div class="input-group">
+            <label>Start Date</label>
+            <input type="date" id="start" oninput="generate()">
+        </div>
+        <div class="input-group">
+            <label>End Date</label>
+            <input type="date" id="end" oninput="generate()">
+        </div>
+        <div class="input-group">
+            <label>Total KPI</label>
+            <input type="text" id="total" placeholder="5000" oninput="generate()">
+        </div>
+        <div class="input-group">
+            <label>Daily KPI</label>
+            <input type="text" id="daily" placeholder="150" oninput="generate()">
+        </div>
+        <div class="input-group">
+            <label>AMC (AM Code)</label>
+            <input type="text" id="amc" placeholder="JD" oninput="generate()">
+        </div>
+    </div>
+
+    <div class="result-area">
+        <label>Live Preview:</label><br>
+        <div id="outputString">---</div>
+        <div id="saveIndicator" class="save-indicator">✓ Auto-saved to history!</div>
+    </div>
+    
+    <div class="actions">
+        <button class="btn-copy" onclick="copyToClipboard()">Copy to Clipboard</button>
+    </div>
+
+    <div class="history-section">
+        <h3>History Log</h3>
+        <table id="historyTable">
+            <thead>
+                <tr>
+                    <th>Full Generated Name</th>
+                    <th>Created At</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+        <button class="btn-download" onclick="downloadCSV()">Download History (.CSV)</button>
+    </div>
+</div>
+
+<script>
+    let logData = [];
+    let typingTimer;
+    const doneTypingInterval = 1500; // 1.5 seconds delay
+
+    function generate() {
+        const agr = document.getElementById('agr').value.trim();
+        const acc = document.getElementById('acc').value.trim();
+        
+        let chan = document.getElementById('chan').value.trim();
+        chan = chan ? '#' + chan : "";
+        
+        let kpi = document.getElementById('kpi').value.trim();
+        kpi = kpi ? '{' + kpi : "";
+        
+        const startRaw = document.getElementById('start').value;
+        const start = startRaw ? startRaw.replace(/-/g, '') : "";
+        
+        const endRaw = document.getElementById('end').value;
+        const end = endRaw ? endRaw.replace(/-/g, '') : "";
+
+        const total = document.getElementById('total').value.trim();
+        
+        let daily = document.getElementById('daily').value.trim();
+        daily = daily ? daily + '}' : "";
+        
+        const amc = document.getElementById('amc').value.trim();
+
+        const values = [agr, acc, chan, kpi, start, end, total, daily, amc];
+        const result = values.filter(v => v !== "").join("_");
+        
+        document.getElementById('outputString').innerText = result || "---";
+
+        // Handle Automatic Logging
+        clearTimeout(typingTimer);
+        document.getElementById('saveIndicator').style.display = 'none'; // Hide indicator while typing
+        
+        if (result !== "") {
+            typingTimer = setTimeout(autoLog, doneTypingInterval);
+        }
+    }
+
+    function autoLog() {
+        const name = document.getElementById('outputString').innerText;
+        if (name === "---") return;
+        
+        // Prevent logging the exact same string consecutively
+        if (logData.length > 0 && logData[logData.length - 1].name === name) {
+            return;
+        }
+        
+        const timestamp = new Date().toLocaleString();
+        logData.push({name, timestamp});
+        
+        const tableBody = document.querySelector("#historyTable tbody");
+        const row = `<tr><td>${name}</td><td>${timestamp}</td></tr>`;
+        tableBody.innerHTML += row;
+
+        // Show a brief success message in the UI
+        const indicator = document.getElementById('saveIndicator');
+        indicator.style.display = 'block';
+        setTimeout(() => { indicator.style.display = 'none'; }, 3000);
+    }
+
+    function copyToClipboard() {
+        const text = document.getElementById('outputString').innerText;
+        if (text === "---") return;
+        
+        navigator.clipboard.writeText(text);
+        
+        // If they click copy before the 1.5s timer finishes, force an immediate log
+        clearTimeout(typingTimer);
+        autoLog(); 
+        
+        alert("Copied to clipboard!");
+    }
+
+    function downloadCSV() {
+        if (logData.length === 0) return alert("Log is empty! Add some names first.");
+        
+        let csvContent = "data:text/csv;charset=utf-8,Generated Name,Timestamp\n";
+        logData.forEach(row => {
+            csvContent += `"${row.name}","${row.timestamp}"\n`;
+        });
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "account_naming_history.csv");
+        document.body.appendChild(link);
+        link.click();
+    }
+</script>
+
+</body>
+</html>

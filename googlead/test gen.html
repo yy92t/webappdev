@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campaign Naming Generator</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f7f6;
+            display: flex;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            max-width: 600px;
+            width: 100%;
+        }
+        h2 { color: #2c3e50; margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .input-group { display: flex; flex-direction: column; }
+        label { font-size: 12px; font-weight: bold; color: #7f8c8d; margin-bottom: 5px; text-transform: uppercase; }
+        input {
+            padding: 10px;
+            border: 1px solid #dcdde1;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        input:focus { outline: none; border-color: #3498db; box-shadow: 0 0 5px rgba(52,152,219,0.3); }
+        .full-width { grid-column: span 2; }
+        
+        .result-area {
+            background: #f8f9fa;
+            border: 2px dashed #cbd5e0;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            position: relative;
+        }
+        #outputString {
+            word-break: break-all;
+            font-family: "Courier New", Courier, monospace;
+            font-weight: bold;
+            color: #2d3436;
+            font-size: 16px;
+        }
+        button {
+            margin-top: 15px;
+            width: 100%;
+            padding: 12px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        button:hover { background-color: #2980b9; }
+        .copy-status {
+            text-align: center;
+            font-size: 12px;
+            color: #27ae60;
+            margin-top: 5px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Naming Generator</h2>
+    
+    <div class="grid">
+        <div class="input-group">
+            <label>Agreement No.</label>
+            <input type="text" id="agr" placeholder="e.g. AGR-001" oninput="generate()">
+        </div>
+        <div class="input-group">
+            <label>Account Name</label>
+            <input type="text" id="acc" placeholder="e.g. ClientName" oninput="generate()">
+        </div>
+        <div class="input-group">
+            <label>Channel / AdType</label>
+            <input type="text" id="chan" placeholder="e.g. FB-Video" oninput="generate()">
+        </div>
+        <div class="input-group">
+            <label>KPI Metrics</label>
+            <input type="text" id="kpi" placeholder="e.g. CPA" oninput="generate()">
+        </div>
+        <div class="input-group">
+            <label>Start Date</label>
+            <input type="text" id="start" placeholder="YYYYMMDD" oninput="generate()">
+        </div>
+        <div class="input-group">
+            <label>End Date</label>
+            <input type="text" id="end" placeholder="YYYYMMDD" oninput="generate()">
+        </div>
+        <div class="input-group">
+            <label>Total KPI</label>
+            <input type="text" id="total" placeholder="e.g. 5000" oninput="generate()">
+        </div>
+        <div class="input-group">
+            <label>Daily KPI</label>
+            <input type="text" id="daily" placeholder="e.g. 150" oninput="generate()">
+        </div>
+        <div class="input-group full-width">
+            <label>AMC (AM Code)</label>
+            <input type="text" id="amc" placeholder="e.g. JDoe" oninput="generate()">
+        </div>
+    </div>
+
+    <div class="result-area">
+        <label>Generated Name:</label>
+        <div id="outputString">---</div>
+    </div>
+    
+    <button onclick="copyToClipboard()">Copy Result</button>
+    <div id="status" class="copy-status">Copied to clipboard!</div>
+</div>
+
+<script>
+    function generate() {
+        const fields = [
+            document.getElementById('agr').value,
+            document.getElementById('acc').value,
+            document.getElementById('chan').value,
+            document.getElementById('kpi').value,
+            document.getElementById('start').value,
+            document.getElementById('end').value,
+            document.getElementById('total').value,
+            document.getElementById('daily').value,
+            document.getElementById('amc').value
+        ];
+
+        // Filter out empty fields and join with underscores
+        // You can change "_" to "+" if you strictly want plus signs as requested
+        const result = fields.filter(val => val !== "").join("_");
+        
+        document.getElementById('outputString').innerText = result || "---";
+    }
+
+    function copyToClipboard() {
+        const text = document.getElementById('outputString').innerText;
+        if (text === "---") return;
+        
+        navigator.clipboard.writeText(text).then(() => {
+            const status = document.getElementById('status');
+            status.style.display = 'block';
+            setTimeout(() => { status.style.display = 'none'; }, 2000);
+        });
+    }
+</script>
+
+</body>
+</html>

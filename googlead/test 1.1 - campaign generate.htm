@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campaign Naming Tool + CSV Export</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; padding: 20px; color: #333; }
+        .wrapper { max-width: 900px; margin: 0 auto; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        h2 { margin-top: 0; color: #1a73e8; border-bottom: 2px solid #e8eaed; padding-bottom: 10px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; }
+        .field { display: flex; flex-direction: column; }
+        label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-bottom: 5px; color: #70757a; }
+        input { padding: 10px; border: 1px solid #dadce0; border-radius: 4px; outline: none; transition: border 0.2s; }
+        input:focus { border-color: #1a73e8; }
+        .output-box { background: #f8f9fa; border: 1px solid #1a73e8; padding: 20px; border-radius: 8px; margin-top: 20px; text-align: center; }
+        #finalString { font-family: 'Courier New', monospace; font-size: 1.2rem; font-weight: bold; color: #1a73e8; word-break: break-all; }
+        .btn-group { display: flex; gap: 10px; margin-top: 15px; }
+        button { flex: 1; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: opacity 0.2s; }
+        .btn-copy { background: #1a73e8; color: white; }
+        .btn-log { background: #34a853; color: white; }
+        .btn-download { background: #ea4335; color: white; margin-top: 10px; width: 100%; }
+        button:hover { opacity: 0.9; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85rem; }
+        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; }
+        th { background: #f1f3f4; }
+    </style>
+</head>
+<body>
+
+<div class="wrapper">
+    <div class="card">
+        <h2>Campaign Details</h2>
+        <div class="grid">
+            <div class="field"><label>Objective</label><input type="text" id="obj" placeholder="CONV" oninput="update()"></div>
+            <div class="field"><label>Channel</label><input type="text" id="chan" placeholder="FB" oninput="update()"></div>
+            <div class="field"><label>Industry</label><input type="text" id="ind" placeholder="TECH" oninput="update()"></div>
+            <div class="field"><label>Themes</label><input type="text" id="theme" placeholder="SummerSale" oninput="update()"></div>
+            <div class="field"><label>Budget</label><input type="text" id="bud" placeholder="5k" oninput="update()"></div>
+            <div class="field"><label>Month</label><input type="text" id="mon" placeholder="MAR" oninput="update()"></div>
+            <div class="field"><label>Date (Opt)</label><input type="text" id="date" placeholder="15th" oninput="update()"></div>
+            <div class="field"><label>Agreement</label><input type="text" id="agree" placeholder="Signed" oninput="update()"></div>
+            <div class="field"><label>Start Date</label><input type="text" id="start" placeholder="20260301" oninput="update()"></div>
+            <div class="field"><label>End Date</label><input type="text" id="end" placeholder="20260331" oninput="update()"></div>
+        </div>
+
+        <div class="output-box">
+            <div id="finalString">#...</div>
+            <div class="btn-group">
+                <button class="btn-copy" onclick="copyText()">Copy String</button>
+                <button class="btn-log" onclick="logCampaign()">Log to Table</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Campaign Log</h2>
+        <table id="logTable">
+            <thead>
+                <tr>
+                    <th>Generated Name</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+        <button class="btn-download" onclick="downloadCSV()">Download All as CSV</button>
+    </div>
+</div>
+
+<script>
+    let campaignList = [];
+
+    function update() {
+        const val = (id) => document.getElementById(id).value || '';
+        const datePart = val('date') ? `_${val('date')}` : '';
+        
+        const name = `#${val('obj')}_${val('chan')}_${val('ind')}_{${val('theme')}}_[${val('bud')}_${val('mon')}${datePart}_${val('agree')}]_(${val('start')}_${val('end')})`;
+        document.getElementById('finalString').innerText = name;
+    }
+
+    function copyText() {
+        navigator.clipboard.writeText(document.getElementById('finalString').innerText);
+        alert("Copied!");
+    }
+
+    function logCampaign() {
+        const currentName = document.getElementById('finalString').innerText;
+        campaignList.push(currentName);
+        
+        const tbody = document.querySelector('#logTable tbody');
+        const row = tbody.insertRow();
+        row.insertCell(0).innerText = currentName;
+    }
+
+    function downloadCSV() {
+        if (campaignList.length === 0) return alert("Log some campaigns first!");
+        
+        let csvContent = "data:text/csv;charset=utf-8,Campaign Name\n" + campaignList.join("\n");
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "campaign_names.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    update();
+</script>
+
+</body>
+</html>
