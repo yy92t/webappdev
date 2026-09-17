@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <title>Log Hub</title>
+  <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+  <style>
+    body { font-family: 'Segoe UI', 'Roboto', sans-serif; margin: 0; padding: 0; background-color: #f0f2f5; }
+    .container { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
+    .menu-bar { background-color: #003366; border-radius: 8px; margin-bottom: 2rem; padding: 10px 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+    .header { text-align: center; margin-bottom: 2rem; color: #000; }
+    .header h1 { font-size: 2.5rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .header p { color: #6c757d; font-size: 1.1rem; }
+    .chart-card { background-color: #fff; padding: 2rem; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); min-height: 400px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+    .loading-container, .no-data-message, .error-message, .welcome-message { text-align: center; padding: 5rem; color: #777; }
+    .welcome-message { font-size: 2rem; font-weight: bold; color: #003366; }
+    .dropdown-menu-container { position: relative; display: inline-block; }
+    .dropdown-menu-button { background-color: #004d99; color: white; padding: 10px 20px; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: background-color 0.3s ease; }
+    .dropdown-menu-button:hover { background-color: #0066cc; }
+    .dropdown-menu-content { display: none; position: absolute; background-color: #f9f9f9; min-width: 200px; box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2); z-index: 1; border-radius: 8px; padding: 5px 0; }
+    .dropdown-menu-content a { color: black; padding: 12px 16px; text-decoration: none; display: block; text-align: left; }
+    .dropdown-menu-content a:hover { background-color: #f1f1f1; }
+    .dropdown-menu-container:hover .dropdown-menu-content { display: block; }
+    .search-container { display: flex; align-items: center; gap: 10px; flex-grow: 1; justify-content: flex-end; }
+    .search-input { padding: 10px 15px; border-radius: 8px; border: 1px solid #ced4da; font-size: 1rem; width: 200px; }
+    .search-button { background-color: #fff; color: #003366; padding: 10px 20px; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: background-color 0.3s ease; }
+    .search-button:hover { background-color: #e9ecef; }
+    #search-results-container { background-color: #fff; padding: 2rem; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); margin-top: 2rem; }
+    .search-result { border-bottom: 1px solid #e9ecef; padding: 1rem 0; }
+    .search-result:last-child { border-bottom: none; }
+    .submenu-container { position: relative; }
+    .submenu { display: none; position: absolute; top: 0; left: 100%; margin-top: -6px; }
+    .submenu-container:hover .submenu { display: block; }
+    @media (max-width: 768px) {
+      .search-container { flex-direction: column; width: 100%; align-items: stretch; }
+      .search-input { width: 100%; box-sizing: border-box; }
+    }
+  </style>
+  <script>
+    google.charts.load('current', {'packages':['corechart']});
+    google.charts.setOnLoadCallback(runDashboard);
+
+    let dashboardData = {};
+    let uiElements;
+    const currentMonthName = new Date().toLocaleString('default', { month: 'long' });
+
+    const chartConfig = {
+        platformClientCounts: { draw: drawBarChart, options: ['Platform by Client', 'Client', 'Total Meta Budget', 'BAR', true] },
+        frequencyByClient: { draw: drawPieChart, options: ['Total Meta Budget by Client & Platform', true] },
+        currentMonthBudgets: { draw: drawBarChart, options: [`Meta Budget in ${currentMonthName}`, 'Ad Format', 'Total Meta Budget', 'BAR', false] },
+        campaignDurations: { draw: drawBarChart, options: ['Top 5 Campaign Duration by Type', 'Campaign Type', 'Total Duration (Days)', 'BAR', false] }
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+        uiElements = {
+            loading: document.getElementById('loading'),
+            errorMessage: document.getElementById('error-message'),
+            welcomeContainer: document.getElementById('welcome-message-container'),
+            dashboardContent: document.getElementById('dashboard-content'),
+            searchResultsContainer: document.getElementById('search-results-container'),
+            chartDropdownContent: document.getElementById('chart-dropdown-content'),
+            clientDropdownContent: document.getElementById('client-dropdown-content'),
+            searchForm: document.getElementById('search-form'),
+            searchInput: document.getElementById('searchInput'),
+            chartDisplay: document.getElementById('chartDisplay')
+        };
+        document.getElementById('monthly-budget-link').textContent = `Meta Budget in ${currentMonthName}`;
+    });
+
+    function _updateView(viewToShow) {
+        const views = { loading: uiElements.loading, welcome: uiElements.welcomeContainer, dashboard: uiElements.dashboardContent, search: uiElements.searchResultsContainer, error: uiElements.errorMessage };
+        Object.values(views).forEach(view => view.style.display = 'none');
+        if (views[viewToShow]) views[viewToShow].style.display = 'block';
+    }
+
+    function runDashboard() {
+      _updateView('loading');
+      if (typeof google === 'undefined' || !google.script || !google.script.run) {
+        return handleError('This dashboard must be run as a Google Apps Script web app.');
+      }
+      google.script.run.withSuccessHandler(onDataLoad).withFailureHandler(handleError).getDashboardData();
+    }
+
+    function onDataLoad(data) {
+      if (data.error) return handleError(data.error);
+      dashboardData = data.charts;
+      populateClientDropdown();
+      setupEventListeners();
+      _updateView('welcome');
+    }
+
+    function setupEventListeners() {
+      uiElements.chartDropdownContent.addEventListener('click', onChartSelect);
+      uiElements.clientDropdownContent.addEventListener('click', onClientSelect);
+      uiElements.searchForm.addEventListener('submit', onSearch);
+    }
+    
+    function populateClientDropdown() {
+      const clientDropdown = uiElements.clientDropdownContent;
+      clientDropdown.innerHTML = '';
+      const fragment = document.createDocumentFragment();
+      const clients = dashboardData.platformClientCounts ? [...new Set(dashboardData.platformClientCounts.slice(1).map(row => row[0]))].sort() : [];
+      
+      const createLink = (id, text) => {
+          const link = document.createElement('a');
+          link.href = '#';
+          link.dataset.clientId = id;
+          link.textContent = text;
+          return link;
+      };
+
+      fragment.appendChild(createLink('all', 'All Clients'));
+      clients.forEach(client => fragment.appendChild(createLink(client, client)));
+      clientDropdown.appendChild(fragment);
+    }
+
+    function onSearch(event) {
+        event.preventDefault();
+        const campaignType = uiElements.searchInput.value.trim();
+        if (campaignType) {
+            _updateView('loading');
+            google.script.run.withSuccessHandler(displaySearchResults).withFailureHandler(handleError).searchCampaignByType(campaignType);
+        } else {
+            alert('Please enter a Campaign Type to search.');
+        }
+    }
+
+    function displaySearchResults(results) {
+        const container = uiElements.searchResultsContainer;
+        container.innerHTML = '';
+        if (!results || results.length === 0) {
+            container.innerHTML = '<p class="no-data-message">No campaigns found with that type.</p>';
+        } else {
+            const fragment = document.createDocumentFragment();
+            results.forEach(row => {
+                const resultDiv = document.createElement('div');
+                resultDiv.className = 'search-result';
+                resultDiv.innerHTML = `
+                    <b>Campaign ID:</b> ${row.id || 'N/A'}<br><b>Client:</b> ${row.client || 'N/A'}<br>
+                    <b>Platform:</b> ${row.platform || 'N/A'}<br><b>Campaign Type:</b> ${row.campaignType || 'N/A'}<br>
+                    <b>Meta Budget:</b> $${row.budget || 0}<br><b>Start Date:</b> ${row.startDate || 'N/A'}<br>
+                    <b>End Date:</b> ${row.endDate || 'N/A'}`;
+                fragment.appendChild(resultDiv);
+            });
+            container.appendChild(fragment);
+        }
+        _updateView('search');
+    }
+    
+    function onChartSelect(event) {
+        event.preventDefault();
+        const target = event.target.closest('a');
+        if (target) drawSelectedChart(target.dataset.chartId);
+    }
+    
+    function onClientSelect(event) {
+        event.preventDefault();
+        const target = event.target.closest('a');
+        if (target) {
+            const currentChartId = uiElements.chartDropdownContent.querySelector('a')?.dataset.chartId || 'platformClientCounts';
+            drawSelectedChart(currentChartId, target.dataset.clientId);
+        }
+    }
+
+    function drawSelectedChart(chartId, selectedClient = 'all') {
+      _updateView('dashboard');
+      let chartData = dashboardData[chartId];
+      
+      if (selectedClient !== 'all') {
+        if (chartId === 'platformClientCounts') chartData = filterDataByColumn(chartData, selectedClient, 0);
+        else if (chartId === 'frequencyByClient') chartData = filterDataByColumn(chartData, selectedClient, 0, true);
+      }
+
+      uiElements.chartDisplay.innerHTML = '';
+      if (!chartData || chartData.length <= 1) {
+        return uiElements.chartDisplay.innerHTML = '<div class="no-data-message">No data to display.</div>';
+      }
+      
+      const config = chartConfig[chartId];
+      if (config) {
+        config.draw('chartDisplay', chartData, ...config.options);
+      } else {
+        handleError(`Unknown chart ID: ${chartId}`);
+      }
+    }
+    
+    function filterDataByColumn(dataArray, filterValue, columnIndex, partialMatch = false) {
+      const header = dataArray[0];
+      const filteredData = dataArray.slice(1).filter(row => {
+        const cellValue = row[columnIndex] ? String(row[columnIndex]) : '';
+        return partialMatch ? cellValue.includes(filterValue) : cellValue === filterValue;
+      });
+      return [header, ...filteredData];
+    }
+    
+    function drawPieChart(elementId, dataArray, title, isDonut = false) {
+      const data = google.visualization.arrayToDataTable(dataArray);
+      const options = { title, titleTextStyle: { fontSize: 16, bold: true }, pieHole: isDonut ? 0.4 : 0, colors: ['#CC3366', '#009966', '#FF6633', '#6666FF', '#FFCC66'] };
+      new google.visualization.PieChart(document.getElementById(elementId)).draw(data, options);
+    }
+    
+    function drawBarChart(elementId, dataArray, title, vTitle, hTitle, type, isStacked = false) {
+      const data = google.visualization.arrayToDataTable(dataArray);
+      const options = { title, titleTextStyle: { fontSize: 16, bold: true }, hAxis: { title: hTitle, format: 'short' }, vAxis: { title: vTitle }, legend: { position: isStacked ? 'top' : 'none' }, chartArea: { width: '70%', height: '70%' }, isStacked, colors: ['#003366', '#004d99', '#0066cc', '#3385d6', '#66a3e0'] };
+      const chart = (type === 'COLUMN') ? new google.visualization.ColumnChart(document.getElementById(elementId)) : new google.visualization.BarChart(document.getElementById(elementId));
+      chart.draw(data, options);
+    }
+
+    function handleError(error) {
+      const message = typeof error === 'string' ? error : (error.message || 'An unknown error occurred.');
+      uiElements.errorMessage.innerText = `Error: ${message}`;
+      _updateView('error');
+    }
+  </script>
+</head>
+<body>
+  <div class="container">
+    <div class="menu-bar">
+      <div class="dropdown-menu-container">
+        <button class="dropdown-menu-button">Dashboard</button>
+        <div class="dropdown-menu-content" id="chart-dropdown-content">
+          <a href="#" data-chart-id="platformClientCounts">Platform by Client</a>
+          <a href="#" data-chart-id="frequencyByClient">Frequency by Client</a>
+          <a href="#" data-chart-id="currentMonthBudgets" id="monthly-budget-link">Meta Budget This Month</a>
+          <a href="#" data-chart-id="campaignDurations">Campaign Duration</a>
+        </div>
+      </div>
+      <div class="dropdown-menu-container">
+        <button class="dropdown-menu-button">Clients</button>
+        <div class="dropdown-menu-content" id="client-dropdown-content"></div>
+      </div>
+      <div class="dropdown-menu-container">
+        <button class="dropdown-menu-button">External Links</button>
+        <div class="dropdown-menu-content">
+          <a href="https://ads.google.com/nav/selectaccount?sourceid=emp&subid=ww-ww-xs-ip-awhc-a-ogb_dash!o2-ogbait-HK-en-xs-ip-ogb_ai-sf-dw-uao-agembe-acce" target="_blank">Google Ads</a>
+          <a href="https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=849993645534380&business_id=10152303536465770&global_scope_id=10152303536465770&columns=name%2Ccampaign_group_id%2Ccampaign_id%2Cadgroup_id%2Cclicks%2Cimpressions%2Cctr%2Ccpc%2Cspend%2Ccustom_derived_metrics%3A937583531301378%2Ccustom_derived_metrics%3A937584054634659%2Ccustom_derived_metrics%3A1705782506275839%2Caverage_purchases_conversion_value%3Aomni_purchase%2Cpurchase_roas%3Aomni_purchase%2Cwebsite_purchase_roas%3Aoffsite_conversion.fb_pixel_purchase%2Cmobile_app_purchase_roas%3Aapp_custom_event.fb_mobile_purchase%2Cschedule%2Cend_time%2Cbudget%2Cdelivery%2Ccampaign_name%2Cbid%2Cresults%2Creach%2Ccost_per_result%2Ccustom_derived_metrics%3A1159196668728236%2Clast_significant_edit&attribution_windows=default%2C1d_click_all_conversions&time_breakdown=monthly&quick_view_id=122136509966863662&sort=stop_time~0" target="_blank">Meta Ad Manager</a>
+          <a href="https://www.facebook.com/commerce/catalogs/206719950778689/products?nav_source=power_editor&business_id=10153795642274012" target="_blank">Meta Commerce</a>
+          <a href="https://ads.microsoft.com/" target="_blank">Bings</a>
+          <a href="https://authentication.taboola.com/authentication/login?response_type=token" target="_blank">Taboola</a>
+        </div>
+      </div>
+      <div class="dropdown-menu-container">
+        <button class="dropdown-menu-button">Resources</button>
+        <div class="dropdown-menu-content">
+          <a href="https://mail.google.com/mail/u/0/?tab=rm&ogbl#chat/space/AAQAFpfsVCE" target="_blank">Internal</a>
+          <div class="submenu-container">
+            <a href="#" target="_blank">Client Board</a>
+            <div class="dropdown-menu-content submenu">
+              <a href="https://lookerstudio.google.com/u/0/reporting/4c6dbca8-0921-446f-a5ea-0a8a20593af9/page/p_fj0bwnkdrd" target="_blank">Sa Sa Meta Dashboard</a>
+              <a href="#" target="_blank">TBC</a>
+              <a href="#" target="_blank">TBC</a>
+            </div>
+          </div>
+          <a href="https://drive.google.com/drive/folders/0AOFGx6WExpGOUk9PVA" target="_blank">Team Drive</a>
+        </div>
+      </div>
+      <form id="search-form" class="search-container">
+        <input type="text" id="searchInput" class="search-input" placeholder="Enter Campaign Type...">
+        <button type="submit" id="searchButton" class="search-button">Search</button>
+      </form>
+    </div>
+    <div class="header"><h1>Log Hub</h1><p>A real-time dashboard for campaign monitoring.</p></div>
+    <div id="loading" class="chart-card"><h2>Loading Dashboard...</h2></div>
+    <div id="error-message" class="chart-card" style="display: none;"></div>
+    <div id="welcome-message-container" class="chart-card" style="display: none;"><h2 class="welcome-message">Welcome</h2></div>
+    <div id="dashboard-content" style="display: none;"><div id="chartDisplay" class="chart-card"></div></div>
+    <div id="search-results-container" style="display:none;"></div>
+  </div>
+</body>
+</html>

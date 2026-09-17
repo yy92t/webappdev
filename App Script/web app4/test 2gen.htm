@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campaign Naming Generator & Logger</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background-color: #f0f2f5; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 800px; width: 100%; }
+        h2 { color: #1a73e8; margin-top: 0; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .input-group { display: flex; flex-direction: column; }
+        label { font-size: 11px; font-weight: 700; color: #5f6368; margin-bottom: 4px; text-transform: uppercase; }
+        input { padding: 8px; border: 1px solid #dadce0; border-radius: 4px; font-size: 14px; }
+        .result-area { background: #e8f0fe; border-left: 5px solid #1a73e8; padding: 15px; border-radius: 4px; margin: 20px 0; }
+        #outputString { font-family: monospace; font-weight: bold; font-size: 15px; color: #174ea6; }
+        .actions { display: flex; gap: 10px; }
+        button { flex: 1; padding: 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn-copy { background: #1a73e8; color: white; }
+        .btn-log { background: #34a853; color: white; }
+        .btn-download { background: #5f6368; color: white; margin-top: 20px; }
+        button:hover { opacity: 0.9; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f8f9fa; }
+        .history-section { margin-top: 30px; width: 100%; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Campaign Naming Generator</h2>
+    
+    <div class="grid">
+        <div class="input-group">
+            <label>Agreement No.</label>
+            <input type="text" id="agr" placeholder="AGR-001" oninput="generate()">
+        </div>
+        <div class="input-group">
+            <label>Account Name</label>
+            <input type="text" id="acc" placeholder="Brand" oninput="generate()">
+        </div>
+        <div class="input-group">
+            <label>Channel / AdType</label>
+            <input type="text" id="chan" placeholder="Social-Video" oninput="generate()">
+        </div>
+        <div class="input-group">
+            <label>KPI Metrics</label>
+            <input type="text" id="kpi" placeholder="CPA" oninput="generate()">
+        </div>
+        <div class="input-group">
+            <label>Start Date</label>
+            <input type="text" id="start" placeholder="YYYYMMDD" oninput="generate()">
+        </div>
+        <div class="input-group">
+            <label>End Date</label>
+            <input type="text" id="end" placeholder="YYYYMMDD" oninput="generate()">
+        </div>
+        <div class="input-group">
+            <label>Total KPI</label>
+            <input type="text" id="total" placeholder="5000" oninput="generate()">
+        </div>
+        <div class="input-group">
+            <label>Daily KPI</label>
+            <input type="text" id="daily" placeholder="150" oninput="generate()">
+        </div>
+        <div class="input-group">
+            <label>AMC (AM Code)</label>
+            <input type="text" id="amc" placeholder="JD" oninput="generate()">
+        </div>
+    </div>
+
+    <div class="result-area">
+        <label>Live Preview:</label><br>
+        <div id="outputString">---</div>
+    </div>
+    
+    <div class="actions">
+        <button class="btn-copy" onclick="copyToClipboard()">Copy to Clipboard</button>
+        <button class="btn-log" onclick="addToLog()">Add to History Log</button>
+    </div>
+
+    <div class="history-section">
+        <h3>History Log</h3>
+        <table id="historyTable">
+            <thead>
+                <tr>
+                    <th>Full Generated Name</th>
+                    <th>Created At</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+        <button class="btn-download" onclick="downloadCSV()">Download History (.CSV)</button>
+    </div>
+</div>
+
+<script>
+    let logData = [];
+
+    function generate() {
+        const ids = ['agr', 'acc', 'chan', 'kpi', 'start', 'end', 'total', 'daily', 'amc'];
+        const values = ids.map(id => document.getElementById(id).value.trim());
+        const result = values.filter(v => v !== "").join("_");
+        document.getElementById('outputString').innerText = result || "---";
+    }
+
+    function copyToClipboard() {
+        const text = document.getElementById('outputString').innerText;
+        if (text === "---") return;
+        navigator.clipboard.writeText(text);
+        alert("Copied!");
+    }
+
+    function addToLog() {
+        const name = document.getElementById('outputString').innerText;
+        if (name === "---") return;
+        
+        const timestamp = new Date().toLocaleString();
+        logData.push({name, timestamp});
+        
+        const tableBody = document.querySelector("#historyTable tbody");
+        const row = `<tr><td>${name}</td><td>${timestamp}</td></tr>`;
+        tableBody.innerHTML += row;
+    }
+
+    function downloadCSV() {
+        if (logData.length === 0) return alert("Log is empty!");
+        
+        let csvContent = "data:text/csv;charset=utf-8,Generated Name,Timestamp\n";
+        logData.forEach(row => {
+            csvContent += `"${row.name}","${row.timestamp}"\n`;
+        });
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "naming_history.csv");
+        document.body.appendChild(link);
+        link.click();
+    }
+</script>
+
+</body>
+</html>
