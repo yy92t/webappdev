@@ -1,0 +1,21 @@
+
+
+
+# Comprehensive Media Math Calculator
+Created by Thomas Y.Y.Wong
+
+An interactive digital marketing calculator for CPM, CPC, ROAS, conversion metrics, and campaign timelines.
+
+
+
+
+
+
+media-math-calculator/
+│
+├── index.html
+├── css/
+│   └── styles.css
+├── js/
+│   └── engine.js
+└── README.md
